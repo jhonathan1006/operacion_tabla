@@ -1,4 +1,4 @@
-Operaciones con tables
+Operaciones con tablas
 ================
 
 ``` r
