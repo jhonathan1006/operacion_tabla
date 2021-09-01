@@ -1,0 +1,154 @@
+---
+title: "Operaciones con tables"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Institución: Unidades Tecnológicas de Santander
+# Programa: Ingenieria en Topografía
+# Autor: "Aponte Saravia Jhonathan"
+```
+### Descripción de contexto
+A continuación, se muestra la réplica de la ejecución de las operaciones básicas con la tabla de atributos desarrollados por Donovan (2019), aplicando la librería dplyr, y utilizando las tablas compartidas en su Github del mismo autor, el propósito difundir las bondades que brinda el programa R Package en la organización de los datos contenida en la estructura de tabla. Además, se intenta de mostrar los pasos a seguir para importar valores de coordenadas para convertir en datos de tipo shapefile.  
+
+```{r}
+library(dplyr)
+excel_data <- read.csv("E:/A_UTS/2021-II/Curso geografia y sistemas de informacion geografica II/Modulo 3 Fundamentos de infraestructura de datos espaciales/Taller/data/AOSI_small.csv", na.strings=c(".", " "))
+excel_data
+
+# Seleccionando datos por filto 
+select(excel_data, Identifiers, GROUP)
+
+
+# Remover  columnas de la tabla
+select(excel_data, -Gender, -Study_Site)
+
+# Incluyendo solo observaciones asociados a un dato de cierta columna 
+
+filter(excel_data, GROUP=="HR_ASD")
+
+# incluyendo solo los datos donde selelecione un rango de valores 
+
+filter(excel_data, GROUP=="HR_ASD" & V06.aosi.total_score_1_18>=10)
+
+# filtrar las observaciones que consideren solo a genero femenino
+filter(excel_data, Gender=="Female") 
+
+filter(excel_data, Gender=="Male") 
+
+# Reordenada la edad de manea creciente
+arrange(excel_data, GROUP, V12.aosi.Candidate_Age) 
+#de menera decreciente 
+arrange(excel_data, GROUP, desc(V06.aosi.Candidate_Age)) 
+
+## Mutar y resumir 
+# estas funciones nos permiten  crear nuevas variables para agregar al conjunto de los datos
+
+HR_data <- read.csv("E:/A_UTS/2021-II/Curso geografia y sistemas de informacion geografica II/Modulo 3 Fundamentos de infraestructura de datos espaciales/Taller/data//Cross-sec_full.csv", na.strings=c(".", " ")) 
+HR_data <- filter(HR_data, V24.demographics.Risk=="HR")
+HR_data
+# creando variables utilizando la función mutate()
+
+HR_data <- mutate(HR_data, Mullen_Mean=(`V06.mullen.composite_standard_score`+`V12.mullen.composite_standard_score`+
+                                          `V24.mullen.composite_standard_score`+`V36.mullen.composite_standard_score`)/4,
+                  Site_Location=factor(ifelse(Study_Site=="PHI"|Study_Site=="UNC","East_Coast",
+                                              ifelse(Study_Site=="STL","Midwest","West_Coast"))))
+
+ftable(HR_data$Study_Site, HR_data$Site_Location)
+
+
+# Importando 
+aosi_data <- read.csv("E:/A_UTS/2021-II/Curso geografia y sistemas de informacion geografica II/Modulo 3 Fundamentos de infraestructura de datos espaciales/Taller/data/cross-sec_aosi.csv", na.strings=c(".", " "))
+aosi_data
+
+# obteniendo los valores de estadica descriptiva 
+summarise(aosi_data, sample_size=n(), mean_aosi_ts_V6=mean(V06.aosi.total_score_1_18), mean_aosi_ts_V12=mean(V12.aosi.total_score_1_18))
+#
+aosi_data_grouped <- group_by(aosi_data, Gender, GROUP)
+aosi_data_grouped
+
+summarise(aosi_data_grouped, sample_size=n(), mean_aosi_ts_V6=mean(V06.aosi.total_score_1_18), mean_aosi_ts_V12=mean(V12.aosi.total_score_1_18))
+
+
+# Reunir, separar, y unir
+# En este proceso la libreria dplyr  tiene funciones  para transformar las dimenciones de los datos 
+# por ejemplo: spread(), gather(), separate() y unite(). 
+
+#Para extrar los nombres de las variables.
+
+vars_to_convert <- names(excel_data)[5:8]
+vars_to_convert
+
+#Para crear nuevas variables 
+library(tidyr)
+excel_data %>%gather(variable, var_value, vars_to_convert)
+
+# Para dividir nuevas variables
+library(tidyr)
+excel_data %>%
+  gather(variable, var_value, vars_to_convert) %>%
+  separate(variable,c("Visit","Variable"),sep=3)
+
+# Separar las columnas 
+
+library(tidyr)
+excel_data %>%
+  gather(variable, var_value, vars_to_convert) %>%
+  separate(variable,c("Visit","Variable"),sep=3) %>% 
+  spread(key=Variable, value=var_value)
+
+# Limpando el formto de las variables función de mutar  y renombrar 
+library(tidyr)
+long_data <- excel_data %>%
+  gather(variable, var_value, vars_to_convert) %>%
+  separate(variable,c("Visit","Variable"),sep=3) %>% 
+  spread(key=Variable, value=var_value) %>%
+  plyr::rename(c(".aosi.Candidate_Age"="AOSI_Age",
+                 ".aosi.total_score_1_18"="AOSI_Total_Score")) %>%
+  mutate(ASD_Diag = factor(ifelse(grepl("ASD", GROUP), "ASD_Neg", "ASD_Pos")),
+         Visit=factor(Visit)) %>%
+  arrange(Identifiers, Visit)
+
+long_data
+
+
+#Importando datos desde excel 
+
+library(sp)
+library(sf)
+library(readxl)
+
+Bucara <- read_xlsx("E:/A_manuscrito/Datos_delitos/Bucara/modelo.xlsx")
+Bucara
+str(Bucara)
+
+sapply(Bucara, class)  
+
+coords <- cbind(Bucara$Longgeo, Bucara$Latgeo)   # x1: long; x2: lat
+
+spdf <- SpatialPointsDataFrame(coords, Bucara)
+
+class(spdf)
+
+summary(spdf)
+
+plot(spdf,axe=TRUE)
+
+st_crs(spdf)
+
+proj4string(spdf) <- "+proj=longlat +datum=WGS84"
+
+summary(spdf)
+
+
+
+
+
+
+
+```
+
